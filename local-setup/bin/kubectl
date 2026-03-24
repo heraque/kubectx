@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+IFS=$'\n\t'
+
+SELF_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+KUBE_DIR="${HOME}/.kube"
+
+find_real_kubectl() {
+  local candidate dir
+  local candidates=(
+    "${KUBECTL_REAL:-}"
+    "/usr/local/bin/kubectl"
+    "/opt/homebrew/bin/kubectl"
+    "/Applications/Docker.app/Contents/Resources/bin/kubectl"
+  )
+
+  for candidate in "${candidates[@]}"; do
+    [[ -n "${candidate}" ]] || continue
+    [[ -x "${candidate}" ]] || continue
+    [[ "${candidate}" != "${SELF_PATH}" ]] || continue
+    printf '%s\n' "${candidate}"
+    return 0
+  done
+
+  IFS=':' read -r -a candidates <<< "${PATH:-}"
+  for dir in "${candidates[@]}"; do
+    candidate="${dir%/}/kubectl"
+    [[ -x "${candidate}" ]] || continue
+    [[ "${candidate}" != "${SELF_PATH}" ]] || continue
+    printf '%s\n' "${candidate}"
+    return 0
+  done
+
+  return 1
+}
+
+add_path() {
+  local candidate="${1}" existing
+  [[ -n "${candidate}" ]] || return 0
+  for existing in "${PATHS[@]:-}"; do
+    [[ "${existing}" == "${candidate}" ]] && return 0
+  done
+  PATHS+=("${candidate}")
+}
+
+is_valid_kubeconfig() {
+  "${REAL_KUBECTL}" config view --kubeconfig="${1}" -o json >/dev/null 2>&1
+}
+
+discover_kubeconfigs() {
+  local file
+
+  [[ -d "${KUBE_DIR}" ]] || return 0
+
+  while IFS= read -r file; do
+    [[ -f "${file}" ]] || continue
+    is_valid_kubeconfig "${file}" || continue
+    add_path "${file}"
+  done < <(find "${KUBE_DIR}" -maxdepth 1 -type f | LC_ALL=C sort)
+}
+
+REAL_KUBECTL="$(find_real_kubectl)" || {
+  echo "kubectl wrapper error: no real kubectl binary found" >&2
+  exit 1
+}
+
+PATHS=()
+
+if [[ -n "${KUBECONFIG:-}" ]]; then
+  IFS=':' read -r -a EXPLICIT_PATHS <<< "${KUBECONFIG}"
+  for path in "${EXPLICIT_PATHS[@]}"; do
+    add_path "${path}"
+  done
+fi
+
+discover_kubeconfigs
+
+if [[ "${#PATHS[@]}" -gt 0 ]]; then
+  export KUBECONFIG
+  KUBECONFIG="$(IFS=:; printf '%s' "${PATHS[*]}")"
+fi
+
+exec "${REAL_KUBECTL}" "$@"
