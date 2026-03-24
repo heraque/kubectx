@@ -73,25 +73,56 @@ func (kf *kubeconfigFile) Reset() error {
 }
 
 func kubeconfigPaths() ([]string, error) {
-	// KUBECONFIG env var
+	var explicitPaths []string
 	if v := os.Getenv("KUBECONFIG"); v != "" {
-		return filepath.SplitList(v), nil
+		explicitPaths = filepath.SplitList(v)
 	}
 
 	home := cmdutil.HomeDir()
 	if home == "" {
+		if len(explicitPaths) > 0 {
+			return explicitPaths, nil
+		}
 		return nil, errors.New("HOME or USERPROFILE environment variable not set")
 	}
 
 	kubeDir := filepath.Join(home, ".kube")
-	paths, err := discoverKubeconfigPaths(kubeDir)
+	discoveredPaths, err := discoverKubeconfigPaths(kubeDir)
 	if err != nil {
 		return nil, err
 	}
+	paths := mergeKubeconfigPaths(explicitPaths, discoveredPaths)
 	if len(paths) > 0 {
 		return paths, nil
 	}
 	return []string{filepath.Join(kubeDir, "config")}, nil
+}
+
+func mergeKubeconfigPaths(explicitPaths, discoveredPaths []string) []string {
+	seen := make(map[string]struct{}, len(explicitPaths)+len(discoveredPaths))
+	out := make([]string, 0, len(explicitPaths)+len(discoveredPaths))
+
+	for _, path := range explicitPaths {
+		if path == "" {
+			continue
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		out = append(out, path)
+	}
+	for _, path := range discoveredPaths {
+		if path == "" {
+			continue
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		out = append(out, path)
+	}
+	return out
 }
 
 func discoverKubeconfigPaths(kubeDir string) ([]string, error) {

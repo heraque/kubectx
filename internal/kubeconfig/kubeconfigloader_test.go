@@ -88,32 +88,61 @@ func Test_kubeconfigPaths_noEnvVars(t *testing.T) {
 }
 
 func Test_kubeconfigPaths_envSingleFile(t *testing.T) {
+	home := t.TempDir()
+	kubeDir := filepath.Join(home, ".kube")
+	if err := os.MkdirAll(kubeDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	discovered := filepath.Join(kubeDir, "extra")
+	if err := os.WriteFile(discovered, []byte("apiVersion: v1\nkind: Config\ncontexts: []\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", "")
 	t.Setenv("KUBECONFIG", "foo")
 
 	v, err := kubeconfigPaths()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(v) != 1 || v[0] != "foo" {
-		t.Fatalf("expected=[\"foo\"], got=%q", v)
+	expected := []string{"foo", discovered}
+	if diff := cmp.Diff(expected, v); diff != "" {
+		t.Fatalf("diff: %s", diff)
 	}
 }
 
 func Test_kubeconfigPaths_envMultipleFiles(t *testing.T) {
+	home := t.TempDir()
+	kubeDir := filepath.Join(home, ".kube")
+	if err := os.MkdirAll(kubeDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	discovered := filepath.Join(kubeDir, "extra")
+	if err := os.WriteFile(discovered, []byte("apiVersion: v1\nkind: Config\ncontexts: []\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
 	path := strings.Join([]string{"file1", "file2", "file3"}, string(os.PathListSeparator))
 	t.Setenv("KUBECONFIG", path)
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", "")
 
 	v, err := kubeconfigPaths()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(v) != 3 || v[0] != "file1" || v[1] != "file2" || v[2] != "file3" {
-		t.Fatalf("expected=[file1,file2,file3], got=%q", v)
+	expected := []string{"file1", "file2", "file3", discovered}
+	if diff := cmp.Diff(expected, v); diff != "" {
+		t.Fatalf("diff: %s", diff)
 	}
 }
 
 func TestStandardKubeconfigLoader_returnsNotFoundErr(t *testing.T) {
+	home := t.TempDir()
 	t.Setenv("KUBECONFIG", "foo")
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", "")
 	kc := new(Kubeconfig).WithLoader(DefaultLoader)
 	err := kc.Parse()
 	if err == nil {
@@ -126,6 +155,8 @@ func TestStandardKubeconfigLoader_returnsNotFoundErr(t *testing.T) {
 
 func TestStandardKubeconfigLoader_multipleFiles_skipsMissing(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", "")
 	existing := filepath.Join(dir, "config1")
 	if err := os.WriteFile(existing, []byte("apiVersion: v1\nkind: Config\ncontexts: []\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -147,6 +178,8 @@ func TestStandardKubeconfigLoader_multipleFiles_skipsMissing(t *testing.T) {
 
 func TestStandardKubeconfigLoader_multipleFiles_allMissing(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", "")
 	path := strings.Join([]string{
 		filepath.Join(dir, "missing1"),
 		filepath.Join(dir, "missing2"),
@@ -164,6 +197,8 @@ func TestStandardKubeconfigLoader_multipleFiles_allMissing(t *testing.T) {
 
 func TestStandardKubeconfigLoader_multipleFiles_loadsAll(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", "")
 	f1 := filepath.Join(dir, "config1")
 	f2 := filepath.Join(dir, "config2")
 	if err := os.WriteFile(f1, []byte("apiVersion: v1\nkind: Config\ncontexts: []\n"), 0644); err != nil {
