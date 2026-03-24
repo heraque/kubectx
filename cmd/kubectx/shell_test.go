@@ -111,3 +111,14 @@ func Test_checkIsolatedMode_set(t *testing.T) {
 		t.Errorf("error message %q does not contain %q", err.Error(), want)
 	}
 }
+
+func Test_kubectlEnv_overridesKubeconfig(t *testing.T) {
+	env := kubectlEnv([]string{"A=1", "KUBECONFIG=old"}, []string{"/tmp/a", "/tmp/b"})
+	want := "KUBECONFIG=/tmp/a:/tmp/b"
+	for _, kv := range env {
+		if kv == want {
+			return
+		}
+	}
+	t.Fatalf("expected %q in env, got %v", want, env)
+}

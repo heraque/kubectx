@@ -123,17 +123,14 @@ func TestKubeconfig_UnsetCurrentContext_MultiFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// After unsetting, GetCurrentContext should return ctx2 (from second file)
-	// Re-parse the saved output to verify
 	out0 := tl.OutputOf(0)
 	expected0 := testutil.KC().WithCurrentCtx("").WithCtxs(testutil.Ctx("ctx1")).ToYAML(t)
 	if out0 != expected0 {
 		t.Fatalf("file 0: expected=\"%s\"; got=\"%s\"", expected0, out0)
 	}
 
-	// Second file should be unchanged
 	out1 := tl.OutputOf(1)
-	expected1 := testutil.KC().WithCurrentCtx("ctx2").WithCtxs(testutil.Ctx("ctx2")).ToYAML(t)
+	expected1 := testutil.KC().WithCurrentCtx("").WithCtxs(testutil.Ctx("ctx2")).ToYAML(t)
 	if out1 != expected1 {
 		t.Fatalf("file 1: expected=\"%s\"; got=\"%s\"", expected1, out1)
 	}

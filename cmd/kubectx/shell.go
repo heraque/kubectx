@@ -102,7 +102,7 @@ func (op ShellOp) Run(_, stderr io.Writer) error {
 	}
 
 	// Extract minimal kubeconfig using kubectl
-	data, err := extractMinimalKubeconfig(kubectlPath, op.Target)
+	data, err := extractMinimalKubeconfig(kubectlPath, op.Target, kc.ConfigPaths())
 	if err != nil {
 		return fmt.Errorf("failed to extract kubeconfig for context: %w", err)
 	}
@@ -158,15 +158,31 @@ func resolveKubectl() (string, error) {
 	return path, nil
 }
 
-func extractMinimalKubeconfig(kubectlPath, contextName string) ([]byte, error) {
+func extractMinimalKubeconfig(kubectlPath, contextName string, kubeconfigPaths []string) ([]byte, error) {
 	cmd := exec.Command(kubectlPath, "config", "view", "--minify", "--flatten",
 		"--context", contextName)
-	cmd.Env = os.Environ()
+	cmd.Env = kubectlEnv(os.Environ(), kubeconfigPaths)
 	data, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("kubectl config view failed: %w", err)
 	}
 	return data, nil
+}
+
+func kubectlEnv(baseEnv []string, kubeconfigPaths []string) []string {
+	env := append([]string(nil), baseEnv...)
+	if len(kubeconfigPaths) == 0 {
+		return env
+	}
+
+	kubeconfigValue := "KUBECONFIG=" + strings.Join(kubeconfigPaths, string(os.PathListSeparator))
+	for i, kv := range env {
+		if strings.HasPrefix(kv, "KUBECONFIG=") {
+			env[i] = kubeconfigValue
+			return env
+		}
+	}
+	return append(env, kubeconfigValue)
 }
 
 func detectShell() string {

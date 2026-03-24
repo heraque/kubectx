@@ -38,12 +38,34 @@ func (k *Kubeconfig) DeleteContextEntry(deleteName string) error {
 	)
 }
 
-// ModifyCurrentContext always writes to the first file (matching kubectl behavior).
+// ModifyCurrentContext writes current-context to the file that owns the target
+// context and clears it from the remaining files to keep multi-file configs
+// unambiguous.
 func (k *Kubeconfig) ModifyCurrentContext(name string) error {
 	if len(k.files) == 0 {
 		return errNoFiles
 	}
-	return k.files[0].config.PipeE(yaml.SetField("current-context", yaml.NewScalarRNode(name)))
+
+	_, fileIdx, err := k.contextNodeWithFileIndex(name)
+	if err != nil {
+		if len(k.files) == 1 {
+			return k.files[0].config.PipeE(yaml.SetField("current-context", yaml.NewScalarRNode(name)))
+		}
+		return err
+	}
+
+	for i := range k.files {
+		if i == fileIdx {
+			if err := k.files[i].config.PipeE(yaml.SetField("current-context", yaml.NewScalarRNode(name))); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := k.files[i].config.PipeE(yaml.SetField("current-context", yaml.NewStringRNode(""))); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (k *Kubeconfig) ModifyContextName(old, new string) error {

@@ -179,7 +179,7 @@ func TestKubeconfig_ModifyContextName(t *testing.T) {
 	}
 }
 
-func TestKubeconfig_ModifyCurrentContext_MultiFile_WritesToFirst(t *testing.T) {
+func TestKubeconfig_ModifyCurrentContext_MultiFile_WritesToContainingFile(t *testing.T) {
 	cfg1 := testutil.KC().WithCurrentCtx("ctx1").WithCtxs(testutil.Ctx("ctx1")).ToYAML(t)
 	cfg2 := testutil.KC().WithCurrentCtx("ctx2").WithCtxs(testutil.Ctx("ctx2")).ToYAML(t)
 	tl := WithMockMultiKubeconfigLoader(cfg1, cfg2)
@@ -194,14 +194,14 @@ func TestKubeconfig_ModifyCurrentContext_MultiFile_WritesToFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// First file should have new current-context
+	// First file should have current-context cleared.
 	out0 := tl.OutputOf(0)
-	expected0 := testutil.KC().WithCurrentCtx("ctx2").WithCtxs(testutil.Ctx("ctx1")).ToYAML(t)
+	expected0 := testutil.KC().WithCurrentCtx("").WithCtxs(testutil.Ctx("ctx1")).ToYAML(t)
 	if diff := cmp.Diff(expected0, out0); diff != "" {
 		t.Fatalf("file 0 diff: %s", diff)
 	}
 
-	// Second file should be unchanged
+	// Second file should carry the selected current-context.
 	out1 := tl.OutputOf(1)
 	expected1 := testutil.KC().WithCurrentCtx("ctx2").WithCtxs(testutil.Ctx("ctx2")).ToYAML(t)
 	if diff := cmp.Diff(expected1, out1); diff != "" {

@@ -19,8 +19,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/ahmetb/kubectx/internal/cmdutil"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -76,10 +78,97 @@ func kubeconfigPaths() ([]string, error) {
 		return filepath.SplitList(v), nil
 	}
 
-	// default path
 	home := cmdutil.HomeDir()
 	if home == "" {
 		return nil, errors.New("HOME or USERPROFILE environment variable not set")
 	}
-	return []string{filepath.Join(home, ".kube", "config")}, nil
+
+	kubeDir := filepath.Join(home, ".kube")
+	paths, err := discoverKubeconfigPaths(kubeDir)
+	if err != nil {
+		return nil, err
+	}
+	if len(paths) > 0 {
+		return paths, nil
+	}
+	return []string{filepath.Join(kubeDir, "config")}, nil
+}
+
+func discoverKubeconfigPaths(kubeDir string) ([]string, error) {
+	entries, err := os.ReadDir(kubeDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read kubeconfig directory %q: %w", kubeDir, err)
+	}
+
+	configPath := filepath.Join(kubeDir, "config")
+	var extraPaths []string
+
+	for _, entry := range entries {
+		if entry.Name() == "config" {
+			continue
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			return nil, fmt.Errorf("failed to stat %q: %w", filepath.Join(kubeDir, entry.Name()), err)
+		}
+		if !info.Mode().IsRegular() {
+			continue
+		}
+
+		path := filepath.Join(kubeDir, entry.Name())
+		ok, err := isKubeconfigFile(path)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			extraPaths = append(extraPaths, path)
+		}
+	}
+
+	slices.Sort(extraPaths)
+
+	info, err := os.Stat(configPath)
+	switch {
+	case err == nil && info.Mode().IsRegular():
+		return append([]string{configPath}, extraPaths...), nil
+	case err == nil:
+		return extraPaths, nil
+	case os.IsNotExist(err):
+		return extraPaths, nil
+	default:
+		return nil, fmt.Errorf("failed to stat %q: %w", configPath, err)
+	}
+}
+
+func isKubeconfigFile(path string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, fmt.Errorf("failed to open %q while scanning kubeconfigs: %w", path, err)
+	}
+	defer f.Close()
+
+	var node yaml.Node
+	if err := yaml.NewDecoder(f).Decode(&node); err != nil {
+		return false, nil
+	}
+	if node.Kind != yaml.DocumentNode || len(node.Content) == 0 {
+		return false, nil
+	}
+
+	root := node.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return false, nil
+	}
+
+	for i := 0; i+1 < len(root.Content); i += 2 {
+		switch root.Content[i].Value {
+		case "apiVersion", "kind", "clusters", "contexts", "users", "current-context":
+			return true, nil
+		}
+	}
+	return false, nil
 }

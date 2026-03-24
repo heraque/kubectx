@@ -21,10 +21,13 @@ import (
 	"testing"
 
 	"github.com/ahmetb/kubectx/internal/cmdutil"
+	"github.com/google/go-cmp/cmp"
 )
 
 func Test_kubeconfigPaths_default(t *testing.T) {
+	t.Setenv("KUBECONFIG", "")
 	t.Setenv("HOME", "/x/y/z")
+	t.Setenv("USERPROFILE", "")
 
 	expected := filepath.FromSlash("/x/y/z/.kube/config")
 	got, err := kubeconfigPaths()
@@ -36,7 +39,44 @@ func Test_kubeconfigPaths_default(t *testing.T) {
 	}
 }
 
+func Test_kubeconfigPaths_discoversFilesInKubeDir(t *testing.T) {
+	home := t.TempDir()
+	kubeDir := filepath.Join(home, ".kube")
+	if err := os.MkdirAll(kubeDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	configPath := filepath.Join(kubeDir, "config")
+	otherPath := filepath.Join(kubeDir, "team-b")
+	ignoredPath := filepath.Join(kubeDir, "kubectx")
+
+	if err := os.WriteFile(configPath, []byte("apiVersion: v1\nkind: Config\ncontexts: []\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(otherPath, []byte("apiVersion: v1\nkind: Config\ncontexts: []\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ignoredPath, []byte("previous-context"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("KUBECONFIG", "")
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", "")
+
+	got, err := kubeconfigPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := []string{configPath, otherPath}
+	if diff := cmp.Diff(expected, got); diff != "" {
+		t.Fatalf("diff: %s", diff)
+	}
+}
+
 func Test_kubeconfigPaths_noEnvVars(t *testing.T) {
+	t.Setenv("KUBECONFIG", "")
 	t.Setenv("XDG_CACHE_HOME", "")
 	t.Setenv("HOME", "")
 	t.Setenv("USERPROFILE", "")
