@@ -8,7 +8,7 @@ Conteudo:
 - `bin/linux-amd64/kubectx`
 - `bin/linux-arm64/kubectx`
 - `bin/kubectl`: wrapper que agrega todos os kubeconfigs validos de `~/.kube`
-- `install.sh`: instala o binario correto para a plataforma e o wrapper `kubectl`
+- `install.sh`: instala o binario correto para a plataforma, o wrapper `kubectl`, cria `alias ctx="kubectx"` e ajusta `~/.zprofile` no macOS ou `.zshrc`/`.bashrc` no Linux
 
 Uso padrao:
 

@@ -8,9 +8,10 @@ SOURCE_BIN_DIR="${ROOT_DIR}/bin"
 TARGET_BIN_DIR=""
 INSTALL_OS=""
 INSTALL_ARCH=""
-ZPROFILE="${HOME}/.zprofile"
 PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
-PATH_FILES=("${HOME}/.zprofile" "${HOME}/.zshrc" "${HOME}/.zshenv" "${HOME}/.profile")
+ALIAS_LINE='alias ctx="kubectx"'
+RC_FILE=""
+PATH_FILES=("${HOME}/.zprofile" "${HOME}/.zshrc" "${HOME}/.zshenv" "${HOME}/.bashrc" "${HOME}/.profile")
 
 usage() {
   cat <<'EOF'
@@ -45,6 +46,28 @@ normalize_arch() {
   esac
 }
 
+detect_rc_file() {
+  local shell_name
+  shell_name="$(basename "${SHELL:-}")"
+
+  if [[ "${INSTALL_OS}" == "darwin" ]]; then
+    printf '%s\n' "${HOME}/.zprofile"
+    return 0
+  fi
+
+  case "${shell_name}" in
+    zsh)
+      printf '%s\n' "${HOME}/.zshrc"
+      ;;
+    bash)
+      printf '%s\n' "${HOME}/.bashrc"
+      ;;
+    *)
+      printf '%s\n' "${HOME}/.bashrc"
+      ;;
+  esac
+}
+
 while [[ $# -gt 0 ]]; do
   case "${1}" in
     --os)
@@ -75,6 +98,7 @@ INSTALL_OS="${INSTALL_OS:-$(normalize_os "$(uname -s)")}"
 INSTALL_ARCH="${INSTALL_ARCH:-$(normalize_arch "$(uname -m)")}"
 TARGET_BIN_DIR="${TARGET_BIN_DIR:-$([[ "${INSTALL_OS}" == "linux" ]] && printf '/usr/local/bin' || printf '%s/.local/bin' "${HOME}")}"
 SOURCE_KUBECTX="${SOURCE_BIN_DIR}/${INSTALL_OS}-${INSTALL_ARCH}/kubectx"
+RC_FILE="$(detect_rc_file)"
 
 mkdir -p "${TARGET_BIN_DIR}"
 
@@ -101,13 +125,31 @@ if [[ "${TARGET_BIN_DIR}" == "${HOME}/.local/bin" ]]; then
       printf '\n'
       printf '%s\n' '# Added by local-setup/install.sh'
       printf '%s\n' "${PATH_LINE}"
-    } >> "${ZPROFILE}"
+    } >> "${RC_FILE}"
   fi
 fi
 
+FOUND_CTX_ALIAS=0
+for path_file in "${PATH_FILES[@]}"; do
+  [[ -f "${path_file}" ]] || continue
+  if grep -F 'alias ctx=' "${path_file}" >/dev/null 2>&1; then
+    FOUND_CTX_ALIAS=1
+    break
+  fi
+done
+
+if [[ "${FOUND_CTX_ALIAS}" -eq 0 ]]; then
+  {
+    printf '\n'
+    printf '%s\n' '# Added by local-setup/install.sh'
+    printf '%s\n' "${ALIAS_LINE}"
+  } >> "${RC_FILE}"
+fi
+
 printf 'Detected platform: %s/%s\n' "${INSTALL_OS}" "${INSTALL_ARCH}"
+printf 'Shell rc file: %s\n' "${RC_FILE}"
 printf 'Installed kubectx to %s\n' "${TARGET_BIN_DIR}/kubectx"
 printf 'Installed kubectl wrapper to %s\n' "${TARGET_BIN_DIR}/kubectl"
 if [[ "${TARGET_BIN_DIR}" == "${HOME}/.local/bin" ]]; then
-  printf 'Open a new shell or run: exec zsh -l\n'
+  printf 'Open a new shell or reload %s\n' "${RC_FILE}"
 fi
