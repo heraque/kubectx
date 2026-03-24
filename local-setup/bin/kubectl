@@ -61,7 +61,7 @@ discover_kubeconfigs() {
 }
 
 REAL_KUBECTL="$(find_real_kubectl)" || {
-  echo "kubectl wrapper error: no real kubectl binary found" >&2
+  echo "erro no wrapper kubectl: nenhum binario kubectl real foi encontrado" >&2
   exit 1
 }
 

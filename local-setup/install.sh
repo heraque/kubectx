@@ -15,10 +15,10 @@ PATH_FILES=("${HOME}/.zprofile" "${HOME}/.zshrc" "${HOME}/.zshenv" "${HOME}/.bas
 
 usage() {
   cat <<'EOF'
-Usage:
+Uso:
   ./install.sh [--os darwin|linux] [--arch amd64|arm64] [--target-dir DIR]
 
-Defaults:
+Padroes:
   macOS  -> ~/.local/bin
   Linux  -> /usr/local/bin
 EOF
@@ -29,7 +29,7 @@ normalize_os() {
     Darwin|darwin) printf 'darwin\n' ;;
     Linux|linux) printf 'linux\n' ;;
     *)
-      echo "unsupported OS: ${1}" >&2
+      echo "sistema operacional nao suportado: ${1}" >&2
       exit 1
       ;;
   esac
@@ -40,7 +40,7 @@ normalize_arch() {
     x86_64|amd64) printf 'amd64\n' ;;
     arm64|aarch64) printf 'arm64\n' ;;
     *)
-      echo "unsupported architecture: ${1}" >&2
+      echo "arquitetura nao suportada: ${1}" >&2
       exit 1
       ;;
   esac
@@ -87,7 +87,7 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "unknown argument: ${1}" >&2
+      echo "argumento desconhecido: ${1}" >&2
       usage
       exit 1
       ;;
@@ -103,7 +103,7 @@ RC_FILE="$(detect_rc_file)"
 mkdir -p "${TARGET_BIN_DIR}"
 
 if [[ ! -x "${SOURCE_KUBECTX}" ]]; then
-  echo "missing kubectx binary for ${INSTALL_OS}/${INSTALL_ARCH}: ${SOURCE_KUBECTX}" >&2
+  echo "binario kubectx ausente para ${INSTALL_OS}/${INSTALL_ARCH}: ${SOURCE_KUBECTX}" >&2
   exit 1
 fi
 
@@ -146,10 +146,10 @@ if [[ "${FOUND_CTX_ALIAS}" -eq 0 ]]; then
   } >> "${RC_FILE}"
 fi
 
-printf 'Detected platform: %s/%s\n' "${INSTALL_OS}" "${INSTALL_ARCH}"
-printf 'Shell rc file: %s\n' "${RC_FILE}"
-printf 'Installed kubectx to %s\n' "${TARGET_BIN_DIR}/kubectx"
-printf 'Installed kubectl wrapper to %s\n' "${TARGET_BIN_DIR}/kubectl"
+printf 'Plataforma detectada: %s/%s\n' "${INSTALL_OS}" "${INSTALL_ARCH}"
+printf 'Arquivo de shell rc: %s\n' "${RC_FILE}"
+printf 'kubectx instalado em %s\n' "${TARGET_BIN_DIR}/kubectx"
+printf 'wrapper kubectl instalado em %s\n' "${TARGET_BIN_DIR}/kubectl"
 if [[ "${TARGET_BIN_DIR}" == "${HOME}/.local/bin" ]]; then
-  printf 'Open a new shell or reload %s\n' "${RC_FILE}"
+  printf 'Abra um novo shell ou recarregue %s\n' "${RC_FILE}"
 fi
