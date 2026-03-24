@@ -4,19 +4,33 @@ Artifacts para reinstalar seu fluxo local sem depender de Homebrew.
 
 Conteudo:
 
-- `bin/kubectx`: binario buildado desta branch para macOS local.
-- `bin/kubectl`: wrapper que agrega todos os kubeconfigs validos de `~/.kube`.
-- `install.sh`: instala ambos em `~/.local/bin` e garante `PATH`.
+- `bin/darwin-arm64/kubectx`
+- `bin/linux-amd64/kubectx`
+- `bin/linux-arm64/kubectx`
+- `bin/kubectl`: wrapper que agrega todos os kubeconfigs validos de `~/.kube`
+- `install.sh`: instala o binario correto para a plataforma e o wrapper `kubectl`
 
-Uso:
+Uso padrao:
 
 ```sh
 cd local-setup
 ./install.sh
-exec zsh -l
+```
+
+Exemplos:
+
+```sh
+# macOS: instala em ~/.local/bin e garante PATH
+./install.sh
+
+# Linux: por padrao instala em /usr/local/bin
+sudo ./install.sh
+
+# Override manual
+./install.sh --os linux --arch amd64 --target-dir "$HOME/bin"
 ```
 
 Observacoes:
 
 - O wrapper `kubectl` delega para um `kubectl` real ja instalado na maquina.
-- O binario `kubectx` aqui e um build local para a arquitetura atual.
+- O `kubectx` e empacotado por plataforma/arquitetura; binario de macOS nao roda em Linux.
